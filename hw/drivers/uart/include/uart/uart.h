@@ -76,14 +76,14 @@ struct uart_driver_funcs {
  * ***Note that these enum values must match what hw/hal/hal_uart.h***
  */
 enum uart_parity {
-    UART_PARITY_NONE = 0,       /* no parity */
-    UART_PARITY_ODD = 1,        /* odd parity bit */
-    UART_PARITY_EVEN = 2        /* even parity bit */
+    _UART_PARITY_NONE = 0,       /* no parity */
+    _UART_PARITY_ODD = 1,        /* odd parity bit */
+    _UART_PARITY_EVEN = 2        /* even parity bit */
 };
 
 enum uart_flow_ctl {
-    UART_FLOW_CTL_NONE = 0,     /* no flow control */
-    UART_FLOW_CTL_RTS_CTS = 1   /* RTS/CTS */
+    _UART_FLOW_CTL_NONE = 0,     /* no flow control */
+    _UART_FLOW_CTL_RTS_CTS = 1   /* RTS/CTS */
 };
 
 struct uart_conf_port {
