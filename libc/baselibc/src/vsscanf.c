@@ -64,7 +64,7 @@ static inline int test_bit(unsigned long *bitmap, unsigned int bit)
 {
 	return (int)(bitmap[bit / LONG_BIT] >> (bit % LONG_BIT)) & 1;
 }
-
+#if 0
 int vsscanf(const char *buffer, const char *format, va_list ap)
 {
 	const char *p = format;
@@ -398,3 +398,4 @@ int vsscanf(const char *buffer, const char *format, va_list ap)
 
 	return converted;
 }
+#endif
