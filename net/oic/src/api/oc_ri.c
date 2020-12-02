@@ -38,6 +38,8 @@
 #include "oic/oc_ri_const.h"
 #include "api/oc_priv.h"
 
+#define CONTENT_FORMAT_IS_TEXT_PLAIN
+
 #ifdef OC_SECURITY
 #include "security/oc_acl.h"
 #include "security/oc_dtls.h"
@@ -742,7 +744,11 @@ oc_ri_invoke_client_cb(struct coap_packet_rx *rsp, oc_endpoint_t *endpoint)
 {
     oc_client_cb_t *cb, *tmp;
     oc_client_response_t client_response;
+#ifdef CONTENT_FORMAT_IS_TEXT_PLAIN
+    unsigned int content_format = TEXT_PLAIN;
+#else
     unsigned int content_format = APPLICATION_CBOR;
+#endif
     oc_response_handler_t handler;
     int i;
 
@@ -770,10 +776,17 @@ oc_ri_invoke_client_cb(struct coap_packet_rx *rsp, oc_endpoint_t *endpoint)
            and clear callback
            If incoming response type is RST, then clear callback
         */
+#ifdef CONTENT_FORMAT_IS_TEXT_PLAIN
+        if (content_format != TEXT_PLAIN || rsp->type == COAP_TYPE_RST) {
+            free_client_cb(cb);
+            break;
+        }
+#else
         if (content_format != APPLICATION_CBOR || rsp->type == COAP_TYPE_RST) {
             free_client_cb(cb);
             break;
         }
+#endif
 
         /* Check code, translate to oc_status_code, store
            Check observe option:
