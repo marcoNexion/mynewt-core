@@ -132,6 +132,16 @@ static struct hal_uart_irq uart_irqs[4];
 static struct hal_uart_irq uart_irqs[3];
 #endif
 
+#if defined(STM32L4R5xx)
+#define USART_ISR_TXE		USART_ISR_TXE_TXFNF
+#define USART_CR1_TXEIE 	USART_CR1_TXEIE_TXFNFIE
+#define USART_CR1_RXNEIE    USART_CR1_RXNEIE_RXFNEIE
+#define USART_ISR_RXNE	    USART_ISR_RXNE_RXFNE
+
+#define UART_BRR_MIN    0x10U        /* UART BRR minimum authorized value */
+#define UART_BRR_MAX    0x0000FFFFU  /* UART BRR maximum authorized value */
+#endif
+
 #if !MYNEWT_VAL(STM32_HAL_UART_HAS_SR)
 #  define STATUS(x)     ((x)->ISR)
 #  define RXNE          USART_ISR_RXNE
@@ -139,7 +149,7 @@ static struct hal_uart_irq uart_irqs[3];
 #  define TC            USART_ISR_TC
 #  define RXDR(x)       ((x)->RDR)
 #  define TXDR(x)       ((x)->TDR)
-#if MYNEWT_VAL(MCU_STM32WB)
+#if MYNEWT_VAL(MCU_STM32WB) || defined(STM32L4R5xx)
 #  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y), UART_PRESCALER_DIV1)
 #else
 #  define BAUD(x,y)     UART_DIV_SAMPLING16((x), (y))
@@ -428,6 +438,7 @@ int
 hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
   enum hal_uart_parity parity, enum hal_uart_flow_ctl flow_ctl)
 {
+    HAL_StatusTypeDef ret  = HAL_OK;
     struct hal_uart *u;
     const struct stm32_uart_cfg *cfg;
     uint32_t cr1, cr2, cr3;
@@ -554,6 +565,80 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
     u->u_regs->CR3 = cr3;
     u->u_regs->CR2 = cr2;
     u->u_regs->CR1 = cr1;
+
+#if defined(STM32L4R5xx)
+    UART_HandleTypeDef *huart;
+    UART_ClockSourceTypeDef clocksource = UART_CLOCKSOURCE_UNDEFINED;
+    uint32_t pclk;
+    uint32_t usartdiv = 0x00000000U;
+#if defined(USART_PRESC_PRESCALER)
+    uint32_t prescaler = UART_PRESCALER_DIV1;
+#endif
+
+    huart = (UART_HandleTypeDef*)&cfg->suc_uart;
+    UART_GETCLOCKSOURCE(huart, clocksource);
+
+    u->u_regs->BRR = BAUD(clocksource, baudrate);
+
+    switch (clocksource)
+    {
+      case UART_CLOCKSOURCE_PCLK1:
+        pclk = HAL_RCC_GetPCLK1Freq();
+#if defined(USART_PRESC_PRESCALER)
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate, prescaler));
+#else
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate));
+#endif /* USART_PRESC_PRESCALER */
+        break;
+      case UART_CLOCKSOURCE_PCLK2:
+        pclk = HAL_RCC_GetPCLK2Freq();
+#if defined(USART_PRESC_PRESCALER)
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate, prescaler));
+#else
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate));
+#endif /* USART_PRESC_PRESCALER */
+        break;
+      case UART_CLOCKSOURCE_HSI:
+#if defined(USART_PRESC_PRESCALER)
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(HSI_VALUE, baudrate, prescaler));
+#else
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(HSI_VALUE, baudrate));
+#endif /* USART_PRESC_PRESCALER */
+        break;
+      case UART_CLOCKSOURCE_SYSCLK:
+        pclk = HAL_RCC_GetSysClockFreq();
+#if defined(USART_PRESC_PRESCALER)
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate, prescaler));
+#else
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate));
+#endif /* USART_PRESC_PRESCALER */
+        break;
+      case UART_CLOCKSOURCE_LSE:
+#if defined(USART_PRESC_PRESCALER)
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16((uint32_t)LSE_VALUE, baudrate, prescaler));
+#else
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(LSE_VALUE, baudrate));
+#endif /* USART_PRESC_PRESCALER */
+        break;
+      default:
+        ret = HAL_ERROR;
+        break;
+    }
+
+    /* USARTDIV must be greater than or equal to 0d16 */
+    if ((usartdiv >= UART_BRR_MIN) && (usartdiv <= UART_BRR_MAX))
+    {
+      u->u_regs->BRR = usartdiv;
+    }
+    else
+    {
+      ret = HAL_ERROR;
+    }
+
+    assert(ret==HAL_OK);
+
+#else
+
 #ifdef USART6_BASE
     if (cfg->suc_uart == USART1 || cfg->suc_uart == USART6) {
 #else
@@ -569,6 +654,7 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
         u->u_regs->BRR = BAUD(HAL_RCC_GetPCLK1Freq(), baudrate);
     }
 
+#endif
     (void)RXDR(u->u_regs);
     (void)STATUS(u->u_regs);
     hal_uart_set_nvic(cfg->suc_irqn, u);
