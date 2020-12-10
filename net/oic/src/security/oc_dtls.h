@@ -17,7 +17,7 @@
 #ifndef OC_DTLS_H_
 #define OC_DTLS_H_
 
-#include "deps/tinydtls/dtls.h"
+#include "../deps/tinydtls/include/tinydtls/dtls.h"
 #include "oc_uuid.h"
 #include "port/oc_connectivity.h"
 #include "util/oc_process.h"

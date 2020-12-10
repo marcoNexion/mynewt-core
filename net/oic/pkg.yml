@@ -46,12 +46,16 @@ pkg.deps.OC_TRANSPORT_SERIAL:
 pkg.deps.OC_TRANSPORT_LORA:
     - "@apache-mynewt-core/net/lora/node"
 
+#pkg.deps.OC_SECURITY:
+#    - "@apache-mynewt-core/net/oic/src/deps/tinydtls"
+
 # remove debug option to save logging
 pkg.cflags:
     - -std=c99
     - -DSECURE=0
     - "-I@apache-mynewt-core/net/oic/src/port/mynewt"
     - "-I@apache-mynewt-core/net/oic/include/oic"
+    - "-I@apache-mynewt-core/net/oic/deps/tinydtls"
 
 pkg.init:
     oc_init: 'MYNEWT_VAL(OC_SYSINIT_STAGE_MAIN)'
