@@ -56,12 +56,7 @@ dtls_hash_finalize(unsigned char *buf, dtls_hash_t ctx) {
 }
 #endif /* WITH_SHA256 */
 
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-static inline void dtls_hmac_storage_init()
-{ }
-#else /* !WITH_CONTIKI && !WITH_OCF */
 void dtls_hmac_storage_init();
-#endif /* WITH_CONTIKI || WITH_OCF */
 
 /**
  * \defgroup HMAC Keyed-Hash Message Authentication Code (HMAC)

@@ -37,46 +37,27 @@
 #define PACKAGE_STRING "tinydtls 0.8.1"
 #define PACKAGE_VERSION "0.8.1"
 
-#if defined(CONTIKI) || defined(WITH_OCF) || defined(MYNEWT)
-#ifdef CONTIKI
-#include "contiki.h"
-#include "contiki-lib.h"
-#include "contiki-net.h"
-
-#include "contiki-conf.h"
-#else /* CONTIKI */
-#include "../../src/platform-specific/config-ocf.h"
-#endif /* WITH_OCF */
+#include "oic/port/mynewt/config.h"
+#include "global.h"
 
 /* global constants for constrained devices running Contiki */
 #ifndef DTLS_PEER_MAX
-/** The maximum number DTLS peers (i.e. sessions). */
-#ifdef WITH_OCF
 #define DTLS_PEER_MAX (MAX_DTLS_PEERS)
-#else /* WITH_OCF */
-#define DTLS_PEER_MAX 1
-#endif /* CONTIKI */
 #endif
 
 #ifndef DTLS_HANDSHAKE_MAX
-/** The maximum number of concurrent DTLS handshakes. */
-#ifdef WITH_OCF
 #define DTLS_HANDSHAKE_MAX (MAX_DTLS_PEERS)
-#else /* WITH_OCF */
-#define DTLS_HANDSHAKE_MAX 1
-#endif /* CONTIKI */
 #endif
 
 #ifndef DTLS_SECURITY_MAX
 /** The maximum number of concurrently used cipher keys */
-#  define DTLS_SECURITY_MAX (DTLS_PEER_MAX + DTLS_HANDSHAKE_MAX)
+#define DTLS_SECURITY_MAX (DTLS_PEER_MAX + DTLS_HANDSHAKE_MAX)
 #endif
 
 #ifndef DTLS_HASH_MAX
 /** The maximum number of hash functions that can be used in parallel. */
-#  define DTLS_HASH_MAX (3 * DTLS_PEER_MAX)
+#define DTLS_HASH_MAX (3 * DTLS_PEER_MAX)
 #endif
-#endif /* CONTIKI || WITH_OCF */
 
 /* Define if building universal (internal helper macro) */
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
@@ -164,7 +145,7 @@
 /* #define HAVE_SYS_TYPES_H 0 */
 
 /* Define to 1 if you have the <time.h> header file. */
-/* #define HAVE_TIME_H 0 */
+#define HAVE_TIME_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
 /* #define HAVE_UNISTD_H 0 */
@@ -204,31 +185,3 @@
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 
 /* #undef size_t */
-
-/************************************************************************/
-/* Specific Contiki platforms                                           */
-/************************************************************************/
-
-#ifdef CONTIKI
-
-#if CONTIKI_TARGET_ECONOTAG
-#  include "platform-specific/config-econotag.h"
-#endif /* CONTIKI_TARGET_ECONOTAG */
-
-#ifdef CONTIKI_TARGET_CC2538DK
-#  include "platform-specific/config-cc2538dk.h"
-#endif /* CONTIKI_TARGET_CC2538DK */
-
-#ifdef CONTIKI_TARGET_WISMOTE
-#  include "platform-specific/config-wismote.h"
-#endif /* CONTIKI_TARGET_WISMOTE */
-
-#ifdef CONTIKI_TARGET_SKY
-#  include "platform-specific/config-sky.h"
-#endif /* CONTIKI_TARGET_SKY */
-
-#ifdef CONTIKI_TARGET_MINIMAL_NET
-#  include "platform-specific/config-minimal-net.h"
-#endif /* CONTIKI_TARGET_MINIMAL_NET */
-
-#endif /* CONTIKI */

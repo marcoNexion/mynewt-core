@@ -32,21 +32,18 @@
 #ifndef _DTLS_DTLS_H_
 #define _DTLS_DTLS_H_
 
+#include "os/queue.h"
+
 #include <stdint.h>
 
 #include "t_list.h"
 #include "state.h"
 #include "peer.h"
-
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
+#include "netq.h"
 #include "uthash.h"
-#include "t_list.h"
-#endif /* !WITH_CONTIKI && !WITH_OCF */
 
-#ifdef WITH_OCF
 #include "util/oc_etimer.h"
-#include "port/oc_log.h"
-#endif /* WITH_OCF */
+#include "oic/oc_log.h"
 
 #include "alert.h"
 #include "crypto.h"
@@ -329,30 +326,21 @@ typedef struct {
 
 } dtls_handler_t;
 
+SLIST_HEAD(dtls_peers_list, dtls_peer_s);    //struct dtls_peer_list_t peers;
+typedef struct dtls_peers_list dtls_peers_list_t;
+
 /** Holds global information of the DTLS engine. */
 typedef struct dtls_context_t {
   unsigned char cookie_secret[DTLS_COOKIE_SECRET_LENGTH];
   clock_time_t cookie_secret_age; /**< the time the secret has been generated */
 
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-  dtls_peer_t *peers;		/**< peer hash map */
-#else /* !WITH_CONTIKI && !WITH_OCF */
-#ifdef WITH_CONTIKI
-  LIST_STRUCT(peers);
+  ///SLIST_HEAD(, dtls_peer_t) peers;    //struct dtls_peer_list_t peers;
 
-  struct etimer retransmit_timer; /**< fires when the next packet must be sent */
-#else /* WITH_CONTIKI */
-  OC_LIST_STRUCT(peers);
+  dtls_peers_list_t peers;
 
   struct oc_etimer retransmit_timer; /**< fires when the next packet must be sent */
-#endif /* WITH_OCF */
-#endif /* WITH_CONTIKI || WITH_OCF */
 
-#if defined(WITH_OCF) || defined(MYNEWT) 
-  OC_LIST_STRUCT(sendqueue);	/**< the packets to send */
-#else /* WITH_OCF */
-  LIST_STRUCT(sendqueue);	/**< the packets to send */
-#endif /* !WITH_OCF */
+  netq_list_t sendqueue; /**< the packets to send */
 
   void *app;			/**< application-specific data */
 
@@ -363,6 +351,7 @@ typedef struct dtls_context_t {
   dtls_cipher_t selected_cipher; /**< selected ciper suite for handshake */
 
   unsigned char readbuf[DTLS_MAX_BUF];
+
 } dtls_context_t;
 
 /** 

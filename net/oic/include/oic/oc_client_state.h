@@ -39,6 +39,9 @@ typedef struct oc_client_response {
 
 typedef struct oc_server_handle {
     oc_endpoint_t endpoint;
+#ifdef OC_SECURITY
+    bool _secured;
+#endif
 } oc_server_handle_t;
 
 typedef enum {

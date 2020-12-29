@@ -14,35 +14,57 @@
 // limitations under the License.
 */
 
-#ifdef OC_SECURITY
+#include "os/mynewt.h"
 
+
+#if OC_SECURITY
+
+//#include "repos/apache-mynewt-core/net/oic/src/deps/tinydtls/include/tinydtls/dtls_config.h"
 #include "oc_dtls.h"
-#include "api/oc_events.h"
-#include "config.h"
-#include "oc_acl.h"
+//#include "config.h"
+//#include "oc_acl.h"
 #include "oc_buffer.h"
-#include "oc_core_res.h"
-#include "oc_cred.h"
-#include "oc_pstat.h"
-#include "oc_svr.h"
+//#include "oc_core_res.h"
+//#include "oc_cred.h"
+//#include "oc_pstat.h"
+//#include "oc_svr.h"
+#include "../deps/tinydtls/include/tinydtls/dtls_config.h"
 
-OC_PROCESS(oc_dtls_handler, "DTLS Process");
-OC_MEMB(dtls_peers_s, oc_sec_dtls_peer_t, MAX_DTLS_PEERS);
-OC_LIST(dtls_peers);
+#include <os/os.h>                          //  For Mynewt OS functions
+#include <console/console.h>                //  For Mynewt console output. Actually points to libs/semihosting_console
+
+#define LOG  console_printf
+
+//OC_PROCESS(oc_dtls_handler, "DTLS Process");
+
+
+static struct os_mempool dtls_peers_pool;   //OC_MEMB(dtls_peers_s, oc_sec_dtls_peer_t, MAX_DTLS_PEERS);
+static uint8_t oc_sec_dtls_peers_area[OS_MEMPOOL_BYTES(MAX_DTLS_PEERS,
+      sizeof(oc_sec_dtls_peer_t))];
+
+
+static SLIST_HEAD(, oc_sec_dtls_peer) dtls_peers;    //OC_LIST(dtls_peers);
 
 static dtls_context_t *ocf_dtls_context;
 
 oc_sec_dtls_peer_t *
 oc_sec_dtls_get_peer(oc_endpoint_t *endpoint)
 {
-    oc_sec_dtls_peer_t *peer = oc_list_head(dtls_peers);
+    oc_sec_dtls_peer_t *peer; //= oc_list_head(dtls_peers);
 
+    SLIST_FOREACH(peer, &dtls_peers, next) {
+        if (memcmp(&peer->session.addr, endpoint,
+            oc_endpoint_size(endpoint)) == 0)
+            break;
+    }
+    /*
     while (peer != NULL) {
         if (memcmp(&peer->session.addr, endpoint,
             oc_endpoint_size(endpoint)) == 0)
             break;
         peer = oc_list_item_next(peer);
     }
+    */
     return peer;
 }
 
@@ -53,8 +75,8 @@ oc_sec_dtls_remove_peer(oc_endpoint_t *endpoint)
 
     if (peer) {
         LOG("\n\noc_sec_dtls: removed peer\n\n");
-        oc_list_remove(dtls_peers, peer);
-        oc_memb_free(&dtls_peers_s, peer);
+        SLIST_REMOVE(&dtls_peers, peer, oc_sec_dtls_peer, next);//oc_list_remove(dtls_peers, peer);
+        os_memblock_put(&dtls_peers_pool, peer); //oc_memb_free(&dtls_peers_s, peer);
     }
 }
 
@@ -79,7 +101,11 @@ oc_sec_dtls_inactive(void *data)
         }
     } else {
         LOG("\n\noc_sec_dtls: Could not find peer\n\n");
-        LOG("oc_sec_dtls: Num active peers %d\n", oc_list_length(dtls_peers));
+        uint8_t num = 0;
+        SLIST_FOREACH(peer, &dtls_peers, next) {
+            num++;
+        }
+        LOG("oc_sec_dtls: Num active peers %d\n", num);//oc_list_length(dtls_peers));
     }
     LOG("\n\noc_sec_dtls: Terminating DTLS inactivity callback\n\n");
     return DONE;
@@ -91,17 +117,18 @@ oc_sec_dtls_add_peer(oc_endpoint_t *endpoint)
     oc_sec_dtls_peer_t *peer = oc_sec_dtls_get_peer(endpoint);
 
     if (!peer) {
-        peer = oc_memb_alloc(&dtls_peers_s);
+        peer = os_memblock_get(&dtls_peers_pool);//peer = oc_memb_alloc(&dtls_peers_s);
         if (peer) {
             LOG("\n\noc_sec_dtls: Allocating new DTLS peer\n\n");
             memcpy(&peer->session.addr, endpoint, sizeof(oc_endpoint_t));
             peer->session.size = sizeof(oc_endpoint_t);
-            OC_LIST_STRUCT_INIT(peer, send_queue);
+            SLIST_INIT(&peer->send_queue);//OC_LIST_STRUCT_INIT(peer, send_queue);
             peer->connected = false;
-            oc_list_add(dtls_peers, peer);
+            SLIST_INSERT_HEAD(&dtls_peers, peer, next);//oc_list_add(dtls_peers, peer);
 
-            oc_ri_add_timed_event_callback_seconds(&peer->session.addr,
-                         oc_sec_dtls_inactive, DTLS_INACTIVITY_TIMEOUT);
+            /*TODO ML*/
+            //oc_ri_add_timed_event_callback_seconds(&peer->session.addr,
+            //             oc_sec_dtls_inactive, DTLS_INACTIVITY_TIMEOUT);
         }
     }
     return peer;
@@ -139,27 +166,27 @@ static int
 oc_sec_dtls_get_decrypted_message(struct dtls_context_t *ctx,
                                   session_t *session, uint8_t *buf, size_t len)
 {
-    oc_message_t *message = oc_allocate_message();
+    struct os_mbuf *message = oc_allocate_mbuf(&session->addr); //oc_message_t *message = oc_allocate_message();
     if (message) {
-        memcpy(&message->endpoint, &session->addr, sizeof(oc_endpoint_t));
-        memcpy(message->data, buf, len);
-        message->length = len;
+        //memcpy(&message->endpoint, &session->addr, sizeof(oc_endpoint_t));
+        //memcpy(message->data, buf, len);
+        //message->length = len;
         oc_recv_message(message);
     }
     return 0;
 }
 
 void
-oc_sec_dtls_init_connection(oc_message_t *message)
+oc_sec_dtls_init_connection(struct os_mbuf *message)//(oc_message_t *message)
 {
-    oc_sec_dtls_peer_t *peer = oc_sec_dtls_add_peer(&message->endpoint);
+    oc_sec_dtls_peer_t *peer = oc_sec_dtls_add_peer(OC_MBUF_ENDPOINT(message));
 
     if (peer) {
         LOG("\n\noc_dtls: Initializing DTLS connection\n\n");
         dtls_connect(ocf_dtls_context, &peer->session);
-        oc_list_add(peer->send_queue, message);
+        SLIST_INSERT_HEAD(&peer->send_queue, message, om_next);//oc_list_add(peer->send_queue, message);
     } else {
-        oc_message_unref(message);
+        //oc_message_unref(message);
     }
 }
 
@@ -174,17 +201,22 @@ oc_sec_dtls_init_connection(oc_message_t *message)
   Message sent here may have been flagged to get freed OR
   may have been stored for retransmissions.
 */
-int
+/*int
 oc_sec_dtls_send_message(oc_message_t *message)
+*/
+int oc_sec_dtls_send_message(/*oc_endpoint_t *endpoint, */struct os_mbuf *message)
 {
     int ret = 0;
-    oc_sec_dtls_peer_t *peer = oc_sec_dtls_get_peer(&message->endpoint);
+    oc_endpoint_t *endpoint = OC_MBUF_ENDPOINT(message);
+    oc_sec_dtls_peer_t *peer = oc_sec_dtls_get_peer(endpoint);
+
+    uint8_t *data = OS_MBUF_DATA(message, uint8_t *);  //  Fetch the mbuf data.
+    uint16_t size = message->om_len;  //  Fetch the size for the single mbuf.
 
     if (peer) {
-        ret = dtls_write(ocf_dtls_context, &peer->session, message->data,
-                         message->length);
+        ret = dtls_write(ocf_dtls_context, &peer->session, data, size);
     }
-    oc_message_unref(message);
+    //oc_message_unref(message);
     return ret;
 }
 
@@ -198,11 +230,20 @@ static int
 oc_sec_dtls_send_encrypted_message(struct dtls_context_t *ctx,
                                    session_t *session, uint8_t *buf, size_t len)
 {
-    oc_message_t message;
-    memcpy(&message.endpoint, &session->addr, sizeof(oc_endpoint_t));
-    memcpy(message.data, buf, len);
-    message.length = len;
-    oc_send_buffer(&message);
+    //oc_message_t message;
+    struct os_mbuf *message;
+
+    message = oc_allocate_mbuf(&session->addr);
+
+    //memcpy(&message.endpoint, &session->addr, sizeof(oc_endpoint_t));
+    //memcpy(message.data, buf, len);
+    //message.length = len;
+
+    if(message) {
+        os_mbuf_append(message, buf,  len);
+        oc_send_buffer(message);
+    }
+
     return len;
 }
 
@@ -221,13 +262,17 @@ oc_sec_dtls_get_owner_psk(struct dtls_context_t *ctx, const session_t *session,
     case DTLS_PSK_IDENTITY:
     case DTLS_PSK_HINT: {
         LOG("Identity\n");
-        oc_uuid_t *uuid = oc_core_get_device_id(0);
+        /*
+        TODO ML : oc_uuid_t *uuid = oc_core_get_device_id(0);
         memcpy(result, uuid->id, 16);
+        */
         return 16;
     }
         break;
     case DTLS_PSK_KEY: {
         LOG("key\n");
+        /*
+        TODO ML : 
         oc_sec_cred_t *cred = oc_sec_find_cred((oc_uuid_t *)desc);
         oc_sec_dtls_peer_t *peer =
           oc_sec_dtls_get_peer((oc_endpoint_t *)&session->addr);
@@ -236,6 +281,7 @@ oc_sec_dtls_get_owner_psk(struct dtls_context_t *ctx, const session_t *session,
             memcpy(result, cred->key, 16);
             return 16;
         }
+        */
         return 0;
     }
         break;
@@ -253,11 +299,17 @@ oc_sec_dtls_events(struct dtls_context_t *ctx, session_t *session,
 
     if (peer && level == 0 && code == DTLS_EVENT_CONNECTED) {
         peer->connected = true;
+        /*
         oc_message_t *m = oc_list_pop(peer->send_queue);
         while (m != NULL) {
             oc_sec_dtls_send_message(m);
             m = oc_list_pop(peer->send_queue);
+        }*/
+        struct os_mbuf *m;
+        SLIST_FOREACH(m, &peer->send_queue, om_next) {
+            oc_sec_dtls_send_message(m);
         }
+
     } else if (level == 2) {
         oc_sec_dtls_close_finish(&session->addr);
     }
@@ -280,8 +332,8 @@ oc_sec_derive_owner_psk(oc_endpoint_t *endpoint, const char *oxm,
 
     if (peer) {
         dtls_prf_with_current_keyblock(
-          ocf_dtls_context, &peer->session, oxm, oxm_len, server_uuid,
-            server_uuid_len, obt_uuid, obt_uuid_len, (uint8_t *)key, key_len);
+          ocf_dtls_context, &peer->session, (const uint8_t*)oxm, oxm_len, (const uint8_t*)server_uuid,
+            server_uuid_len, (const uint8_t*)obt_uuid, obt_uuid_len, (uint8_t *)key, key_len);
     }
 }
 
@@ -290,21 +342,25 @@ oc_sec_derive_owner_psk(oc_endpoint_t *endpoint, const char *oxm,
   based on examination of the 1st byte proving it is DTLS.
   Data sent to dtls_handle_message(...) for decryption.
 */
-static void
-oc_sec_dtls_recv_message(oc_message_t *message)
+/*static void
+oc_sec_dtls_recv_message(oc_message_t *message)*/
+void oc_sec_dtls_recv_message(struct os_mbuf *message)
 {
-    oc_sec_dtls_peer_t *peer = oc_sec_dtls_add_peer(&message->endpoint);
+    oc_sec_dtls_peer_t *peer = oc_sec_dtls_add_peer(OC_MBUF_ENDPOINT(message));
+
+    uint8_t *data = OS_MBUF_DATA(message, uint8_t *);  //  Fetch the mbuf data.
+    uint16_t size = message->om_len;  //  Fetch the size for the single mbuf.
 
     if (peer) {
         int ret = dtls_handle_message(ocf_dtls_context, &peer->session,
-                                  message->data, message->length);
+                                  data, size);
         if (ret != 0) {
-            oc_sec_dtls_close_finish(&message->endpoint);
+            oc_sec_dtls_close_finish(OC_MBUF_ENDPOINT(message));
         } else {
             peer->timestamp = oc_clock_time();
         }
     }
-    oc_message_unref(message);
+    //oc_message_unref(message);
 }
 
 /* If not owned, select anon_ECDH cipher and enter ready for OTM state */
@@ -314,10 +370,14 @@ oc_sec_dtls_recv_message(oc_message_t *message)
 void
 oc_sec_dtls_init_context(void)
 {
+    os_mempool_init(&dtls_peers_pool, MAX_DTLS_PEERS,
+      sizeof(oc_sec_dtls_peer_t), oc_sec_dtls_peers_area, "oc_dtls_peers");
+    SLIST_INIT(&dtls_peers);
+    
     dtls_init();
     ocf_dtls_context = dtls_new_context(NULL);
 
-    if (oc_sec_provisioned()) {
+    /* TODO ML : if (oc_sec_provisioned())*/if(1) {
         LOG("\n\noc_sec_dtls: Device in normal operation state\n\n");
         dtls_select_cipher(ocf_dtls_context, TLS_PSK_WITH_AES_128_CCM_8);
     } else {
@@ -335,11 +395,18 @@ oc_sec_dtls_close_init(oc_endpoint_t *endpoint)
         dtls_peer_t *peer = dtls_get_peer(ocf_dtls_context, &p->session);
         if (peer) {
             dtls_close(ocf_dtls_context, &p->session);
+            /*
             oc_message_t *m = oc_list_pop(p->send_queue);
             while (m != NULL) {
                 LOG("\n\noc_sec_dtls: Freeing DTLS Peer send queue\n\n");
                 oc_message_unref(m);
                 m = oc_list_pop(p->send_queue);
+            }
+            */
+            struct os_mbuf *m;
+            SLIST_FOREACH(m, &p->send_queue, om_next) {
+                LOG("\n\noc_sec_dtls: Freeing DTLS Peer send queue\n\n");
+                //oc_message_unref(m);
             }
         }
     }
@@ -352,19 +419,26 @@ oc_sec_dtls_close_finish(oc_endpoint_t *endpoint)
     if (p) {
         dtls_peer_t *peer = dtls_get_peer(ocf_dtls_context, &p->session);
         if (peer) {
-            oc_list_remove(ocf_dtls_context->peers, peer);
+            SLIST_REMOVE(&ocf_dtls_context->peers, peer, dtls_peer_s, next); //oc_list_remove(ocf_dtls_context->peers, peer);
             dtls_free_peer(peer);
         }
+        /*
         oc_message_t *m = oc_list_pop(p->send_queue);
         while (m != NULL) {
             LOG("\n\noc_sec_dtls: Freeing DTLS Peer send queue\n\n");
             oc_message_unref(m);
             m = oc_list_pop(p->send_queue);
         }
+        */
+        struct os_mbuf *m;
+        SLIST_FOREACH(m, &p->send_queue, om_next) {
+            LOG("\n\noc_sec_dtls: Freeing DTLS Peer send queue\n\n");
+            //oc_message_unref(m);
+        }
         oc_sec_dtls_remove_peer(endpoint);
     }
 }
-
+/*
 OC_PROCESS_THREAD(oc_dtls_handler, ev, data)
 {
     OC_PROCESS_BEGIN();
@@ -383,5 +457,5 @@ OC_PROCESS_THREAD(oc_dtls_handler, ev, data)
 
     OC_PROCESS_END();
 }
-
+*/
 #endif /* OC_SECURITY */

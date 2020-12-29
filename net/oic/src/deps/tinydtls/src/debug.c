@@ -188,85 +188,16 @@ dsrv_print_addr(const session_t *addr, char *buf, size_t len) {
 
   return p - buf;
 #else /* HAVE_ARPA_INET_H */
-# if WITH_CONTIKI
-  char *p = buf;
-#  ifdef UIP_CONF_IPV6
-  uint8_t i;
-  const char hex[] = "0123456789ABCDEF";
 
-  if (len < 41)
-    return 0;
-
-  *p++ = '[';
-
-  for (i=0; i < 16; i += 2) {
-    if (i) {
-      *p++ = ':';
-    }
-    *p++ = hex[(addr->addr.u8[i] & 0xf0) >> 4];
-    *p++ = hex[(addr->addr.u8[i] & 0x0f)];
-    *p++ = hex[(addr->addr.u8[i+1] & 0xf0) >> 4];
-    *p++ = hex[(addr->addr.u8[i+1] & 0x0f)];
-  }
-  *p++ = ']';
-#  else /* UIP_CONF_IPV6 */
-#   warning "IPv4 network addresses will not be included in debug output"
-
-  if (len < 21)
-    return 0;
-#  endif /* UIP_CONF_IPV6 */
-  if (buf + len - p < 6)
-    return 0;
-
-  p += sprintf(p, ":%d", uip_htons(addr->port));
-
-  return p - buf;
-# else /* WITH_CONTIKI */
   /* TODO: output addresses manually */
 #ifndef MYNEWT
-#   warning "inet_ntop() not available, network addresses will not be included in debug output"
+#warning "inet_ntop() not available, network addresses will not be included in debug output"
 #endif
-# endif /* WITH_CONTIKI */
+
   return 0;
 #endif
 }
 
-#ifdef __ANDROID__
-void
-dsrv_log(log_t level, char *format, ...) {
-  va_list ap;
-
-  if (maxlog < level)
-    return;
-
-  va_start(ap, format);
-  __android_log_vprint(loglevels_android[level], PACKAGE_NAME, format, ap);
-  va_end(ap);
-}
-#elif !defined (WITH_CONTIKI) && !defined (WITH_OCF) && !defined (MYNEWT)
-void 
-dsrv_log(log_t level, char *format, ...) {
-  static char timebuf[32];
-  va_list ap;
-  FILE *log_fd;
-
-  if (maxlog < level)
-    return;
-
-  log_fd = level <= DTLS_LOG_CRIT ? stderr : stdout;
-
-  if (print_timestamp(timebuf,sizeof(timebuf), time(NULL)))
-    fprintf(log_fd, "%s ", timebuf);
-
-  if (level <= DTLS_LOG_DEBUG) 
-    fprintf(log_fd, "%s ", loglevels[level]);
-
-  va_start(ap, format);
-  vfprintf(log_fd, format, ap);
-  va_end(ap);
-  fflush(log_fd);
-}
-#elif defined(MYNEWT)
 void dsrv_log(log_t level, char *format, ...)
 {
   static char timebuf[32];
@@ -285,26 +216,6 @@ void dsrv_log(log_t level, char *format, ...)
   vprintf(format, ap);
   va_end(ap);
 }
-#elif defined (HAVE_VPRINTF) /* WITH_CONTIKI */
-void 
-dsrv_log(log_t level, char *format, ...) {
-  static char timebuf[32];
-  va_list ap;
-
-  if (maxlog < level)
-    return;
-
-  if (print_timestamp(timebuf,sizeof(timebuf), clock_time()))
-    PRINTF("%s ", timebuf);
-
-  if (level <= DTLS_LOG_DEBUG) 
-    PRINTF("%s ", loglevels[level]);
-
-  va_start(ap, format);
-  vprintf(format, ap);
-  va_end(ap);
-}
-#endif /* WITH_CONTIKI */
 
 #ifndef NDEBUG
 /** dumps packets in usual hexdump format */
@@ -344,85 +255,6 @@ void dtls_dsrv_log_addr(log_t level, const char *name, const session_t *addr)
   dsrv_log(level, "%s: %s\n", name, addrbuf);
 }
 
-#ifdef __ANDROID__
-void
-dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, size_t length, int extend) {
-  char *hex_dump_text;
-  char *p;
-  int ret;
-  int size;
-
-  if (maxlog < level)
-    return;
-
-  size = length * 3 + strlen(name) + 22;
-  hex_dump_text = malloc(size);
-  if (!hex_dump_text)
-    return;
-
-  p = hex_dump_text;
-
-  ret = snprintf(p, size, "%s: (%zu bytes): ", name, length);
-  if (ret >= size)
-    goto print;
-  p += ret;
-  size -= ret;
-  while (length--) {
-    ret = snprintf(p, size, "%02X ", *buf++);
-    if (ret >= size)
-      goto print;
-    p += ret;
-    size -= ret;
-  }
-print:
-  __android_log_print(loglevels_android[level], PACKAGE_NAME, "%s\n", hex_dump_text);
-  free(hex_dump_text);
-}
-#elif !defined (WITH_CONTIKI) && !defined(MYNEWT)
-void 
-dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, size_t length, int extend) {
-  static char timebuf[32];
-  FILE *log_fd;
-  int n = 0;
-
-  if (maxlog < level)
-    return;
-
-  log_fd = level <= DTLS_LOG_CRIT ? stderr : stdout;
-
-  if (print_timestamp(timebuf, sizeof(timebuf), time(NULL)))
-    fprintf(log_fd, "%s ", timebuf);
-
-  if (level <= DTLS_LOG_DEBUG) 
-    fprintf(log_fd, "%s ", loglevels[level]);
-
-  if (extend) {
-    fprintf(log_fd, "%s: (%zu bytes):\n", name, length);
-
-    while (length--) {
-      if (n % 16 == 0)
-	fprintf(log_fd, "%08X ", n);
-
-      fprintf(log_fd, "%02X ", *buf++);
-
-      n++;
-      if (n % 8 == 0) {
-	if (n % 16 == 0)
-	  fprintf(log_fd, "\n");
-	else
-	  fprintf(log_fd, " ");
-      }
-    }
-  } else {
-    fprintf(log_fd, "%s: (%zu bytes): ", name, length);
-    while (length--) 
-      fprintf(log_fd, "%02X", *buf++);
-  }
-  fprintf(log_fd, "\n");
-
-  fflush(log_fd);
-}
-#elif defined(MYNEWT)
 void 
 dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, size_t length, int extend) {
   static char timebuf[32];
@@ -466,45 +298,5 @@ dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, s
 
   fflush(log_fd);
 }
-#else /* WITH_CONTIKI */
-void 
-dtls_dsrv_hexdump_log(log_t level, const char *name, const unsigned char *buf, size_t length, int extend) {
-  static char timebuf[32];
-  int n = 0;
-
-  if (maxlog < level)
-    return;
-
-  if (print_timestamp(timebuf,sizeof(timebuf), clock_time()))
-    PRINTF("%s ", timebuf);
-
-  if (level >= 0 && level <= DTLS_LOG_DEBUG) 
-    PRINTF("%s ", loglevels[level]);
-
-  if (extend) {
-    PRINTF("%s: (%zu bytes):\n", name, length);
-
-    while (length--) {
-      if (n % 16 == 0)
-	PRINTF("%08X ", n);
-
-      PRINTF("%02X ", *buf++);
-
-      n++;
-      if (n % 8 == 0) {
-	if (n % 16 == 0)
-	  PRINTF("\n");
-	else
-	  PRINTF(" ");
-      }
-    }
-  } else {
-    PRINTF("%s: (%zu bytes): ", name, length);
-    while (length--) 
-      PRINTF("%02X", *buf++);
-  }
-  PRINTF("\n");
-}
-#endif /* WITH_CONTIKI */
 
 #endif /* NDEBUG */

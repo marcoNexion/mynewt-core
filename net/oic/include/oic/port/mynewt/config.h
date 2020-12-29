@@ -45,10 +45,6 @@ extern "C" {
 #define DEBUG 1
 #endif
 
-#if (MYNEWT_VAL(OC_SECURITY) == 1)
-#define OC_SECURITY
-#endif
-
 typedef os_time_t oc_clock_time_t;
 #define OC_CLOCK_CONF_TICKS_PER_SECOND (OS_TICKS_PER_SEC)
 #ifdef ARCH_sim
@@ -85,10 +81,10 @@ typedef os_time_t oc_clock_time_t;
 //#define MAX_NUM_SUBJECTS (2)
 
 /* Maximum number of concurrent DTLS sessions */
-//#define MAX_DTLS_PEERS (1)
+#define MAX_DTLS_PEERS (1)
 
 /* Max inactivity timeout before tearing down DTLS connection */
-//#define DTLS_INACTIVITY_TIMEOUT (10)
+#define DTLS_INACTIVITY_TIMEOUT (10)
 
 #ifdef __cplusplus
 }

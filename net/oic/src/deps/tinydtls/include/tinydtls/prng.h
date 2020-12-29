@@ -21,7 +21,6 @@
  * @{
  */
 
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
 #include <stdlib.h>
 
 /**
@@ -40,60 +39,6 @@ static inline void
 dtls_prng_init(unsigned short seed) {
 	srand(seed);
 }
-#else /* !WITH_CONTIKI && !WITH_OCF */
-#include <string.h>
-#ifdef WITH_CONTIKI
-#include "random.h"
-#else /* WITH_CONTIKI */
-#include "port/oc_random.h"
-#endif /* WITH_OCF */
-
-#if defined(WITH_CONTIKI) && defined(HAVE_PRNG)
-static inline int
-dtls_prng(unsigned char *buf, size_t len)
-{
-	return contiki_prng_impl(buf, len);
-}
-#else /* WITH_CONTIKI && HAVE_PRNG */
-/**
- * Fills \p buf with \p len random bytes. This is the default
- * implementation for prng().  You might want to change prng() to use
- * a better PRNG on your specific platform.
- */
-static inline int
-dtls_prng(unsigned char *buf, size_t len) {
-#ifdef WITH_CONTIKI
-  unsigned short v = random_rand();
-#elif defined(MYNEWT)  /* WITH_CONTIKI */
-  unsigned short v = oc_random_rand();
-#else /* MYNEWT */
-  unsigned int v = oc_random_value();
-#endif /* WITH_OCF */
-  while (len > sizeof(v)) {
-    memcpy(buf, &v, sizeof(v));
-    len -= sizeof(v);
-    buf += sizeof(v);
-#ifdef WITH_CONTIKI
-    v = random_rand();
-#elif defined(MYNEWT)  /* WITH_CONTIKI */
-    v = oc_random_rand();
-#else /* MYNEWT */
-    v = oc_random_value();
-#endif /* WITH_OCF */
-  }
-
-  memcpy(buf, &v, len);
-  return 1;
-}
-#endif /* !HAVE_PRNG */
-
-static inline void
-dtls_prng_init(unsigned short seed) {
-#ifdef WITH_CONTIKI
-	random_init(seed);
-#endif /* WITH_CONTIKI */
-}
-#endif /* WITH_CONTIKI || WITH_OCF */
 
 /** @} */
 

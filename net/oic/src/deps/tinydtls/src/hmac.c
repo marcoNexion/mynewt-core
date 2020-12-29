@@ -35,62 +35,27 @@
 #define assert(x)
 #endif
 
-//#include "../include/tinydtls/debug.h"
 #include "../include/tinydtls/hmac.h"
 
-/* use malloc()/free() on platforms other than Contiki */
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-#include <stdlib.h>
+/*TODO ML*/
+//#include "../include/tinydtls/debug.h"
+//#include "util/oc_memb.h"
+//OC_MEMB(hmac_context_storage, dtls_hmac_context_t, DTLS_HASH_MAX);
 
 static inline dtls_hmac_context_t *
 dtls_hmac_context_new() {
-  return (dtls_hmac_context_t *)malloc(sizeof(dtls_hmac_context_t));
+  return 0;//(dtls_hmac_context_t *)oc_memb_alloc(&hmac_context_storage);
 }
 
 static inline void
 dtls_hmac_context_free(dtls_hmac_context_t *ctx) {
-  free(ctx);
-}
-
-#else /* !WITH_CONTIKI && !WITH_OCF */
-#ifdef WITH_CONTIKI
-#include "memb.h"
-MEMB(hmac_context_storage, dtls_hmac_context_t, DTLS_HASH_MAX);
-
-static inline dtls_hmac_context_t *
-dtls_hmac_context_new() {
-  return (dtls_hmac_context_t *)memb_alloc(&hmac_context_storage);
-}
-
-static inline void
-dtls_hmac_context_free(dtls_hmac_context_t *ctx) {
-  memb_free(&hmac_context_storage, ctx);
+  //oc_memb_free(&hmac_context_storage, ctx);
 }
 
 void
 dtls_hmac_storage_init() {
-  memb_init(&hmac_context_storage);
+  //oc_memb_init(&hmac_context_storage);
 }
-#else /* WITH_CONTIKI */
-#include "util/oc_memb.h"
-OC_MEMB(hmac_context_storage, dtls_hmac_context_t, DTLS_HASH_MAX);
-
-static inline dtls_hmac_context_t *
-dtls_hmac_context_new() {
-  return (dtls_hmac_context_t *)oc_memb_alloc(&hmac_context_storage);
-}
-
-static inline void
-dtls_hmac_context_free(dtls_hmac_context_t *ctx) {
-  oc_memb_free(&hmac_context_storage, ctx);
-}
-
-void
-dtls_hmac_storage_init() {
-  oc_memb_init(&hmac_context_storage);
-}
-#endif /* WITH_OCF */
-#endif /* WITH_CONTIKI || WITH_OCF */
 
 void
 dtls_hmac_update(dtls_hmac_context_t *ctx,

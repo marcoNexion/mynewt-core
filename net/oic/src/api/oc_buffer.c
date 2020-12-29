@@ -22,13 +22,15 @@
 #include "oic/port/mynewt/config.h"
 #include "messaging/coap/engine.h"
 
-#ifdef OC_SECURITY
-#include "security/oc_dtls.h"
-#endif
-
 #include "oic/oc_buffer.h"
 #include "oic/port/mynewt/adaptor.h"
 #include "oic/port/mynewt/transport.h"
+
+#ifdef OC_SECURITY
+#include "security/oc_dtls.h"
+extern void oc_sec_dtls_recv_message(struct os_mbuf *message);
+extern void oc_sec_dtls_init_connection(struct os_mbuf *message);
+#endif
 
 static struct os_mqueue oc_inq;
 static struct os_mqueue oc_outq;
@@ -84,15 +86,13 @@ oc_buffer_tx(struct os_event *ev)
 #endif
 #ifdef OC_SECURITY
             /* XXX convert this */
-            if (OC_MBUF_ENDPOINT(m)->flags & SECURED) {
+            if (1)/*(OC_MBUF_ENDPOINT(m)->flags & SECURED)*/ {
                 OC_LOG_DEBUG("oc_buffer_tx: DTLS\n");
-
-                if (!oc_sec_dtls_connected(oe)) {
-                    oc_process_post(&oc_dtls_handler,
-                                    oc_events[INIT_DTLS_CONN_EVENT], m);
+                
+                if (!oc_sec_dtls_connected(OC_MBUF_ENDPOINT(m))) {
+                    oc_sec_dtls_init_connection(m); //oc_process_post(&oc_dtls_handler, oc_events[INIT_DTLS_CONN_EVENT], m);
                 } else {
-                    oc_process_post(&oc_dtls_handler,
-                                    oc_events[RI_TO_DTLS_EVENT], m);
+                    oc_sec_dtls_send_message(m);//oc_process_post(&oc_dtls_handler, oc_events[RI_TO_DTLS_EVENT], m);
                 }
             } else
 #endif
@@ -124,9 +124,9 @@ oc_buffer_rx(struct os_event *ev)
         b = m->om_data[0];
         if (b > 19 && b < 64) {
             OC_LOG_DEBUG("oc_buffer_rx: encrypted request\n");
-            oc_process_post(&oc_dtls_handler, oc_events[UDP_TO_DTLS_EVENT], m);
+            oc_sec_dtls_recv_message(m);//oc_process_post(&oc_dtls_handler, oc_events[UDP_TO_DTLS_EVENT], m);
         } else {
-            coap_receive(m);
+            coap_receive(&m);
         }
 #else
         coap_receive(&m);

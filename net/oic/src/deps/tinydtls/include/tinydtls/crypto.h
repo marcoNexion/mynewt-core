@@ -29,7 +29,7 @@
 
 #include <stdlib.h>		/* for rand() and srand() */
 #include <stdint.h>
-
+#include "os/mynewt.h"
 #include "t_list.h"
 
 #include "../../src/aes/rijndael.h"
@@ -40,6 +40,7 @@
 #include "hmac.h"
 #include "ccm.h"
 #include "../../src/ecc/ecc.h"
+
 
 /* TLS_PSK_WITH_AES_128_CCM_8 */
 #define DTLS_CCM_MAC_KEY_LENGTH        0       /* MAC Key length for AES-CCM cipher suites */
@@ -131,11 +132,10 @@ typedef struct {
     /** the session's master secret */
     uint8 master_secret[DTLS_MASTER_SECRET_LENGTH];
   } tmp;
-#if defined(WITH_OCF) || defined(MYNEWT)
-  OC_LIST_STRUCT(reorder_queue);	/**< the packets to reorder */
-#else /* WITH_OCF */
-  LIST_STRUCT(reorder_queue);	/**< the packets to reorder */
-#endif /* !WITH_OCF */
+
+  //netq_list_t reorder_queue;	/**< the packets to reorder */
+
+  SLIST_HEAD(, node_queue_s) reorder_queue;
 
   dtls_hs_state_t hs_state;  /**< handshake protocol status */
 

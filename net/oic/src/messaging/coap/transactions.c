@@ -132,7 +132,8 @@ coap_send_transaction(coap_transaction_t *t)
 #endif /* OC_SERVER */
 
 #ifdef OC_SECURITY
-            if (OC_MBUF_ENDPOINT(t->m)->flags & SECURED) {
+            //TODO : add flags
+            if (1)/*OC_MBUF_ENDPOINT(t->m)->flags & SECURED)*/ {
                 oc_sec_dtls_close_init(OC_MBUF_ENDPOINT(t->m));
             }
 #endif /* OC_SECURITY */

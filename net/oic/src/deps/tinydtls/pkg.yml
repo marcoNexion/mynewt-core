@@ -29,7 +29,7 @@ pkg.deps:
     - "@apache-mynewt-core/net/ip/mn_socket/selftest"
 
 pkg.cflags:
-    - "-I@apache-mynewt-core/net/oic/deps/tinydtls"
+    - "-I@apache-mynewt-core/net/oic/src/deps/tinydtls/include/tinydtls"
     - "-I@apache-mynewt-core/net/oic/src"
     - "-I@apache-mynewt-core/net/ip/mn_socket/include/mn_socket"
 

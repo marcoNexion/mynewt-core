@@ -20,6 +20,7 @@
 #include "../deps/tinydtls/include/tinydtls/dtls.h"
 #include "oc_uuid.h"
 #include "port/oc_connectivity.h"
+#include <os/os_mbuf.h>
 #include "util/oc_process.h"
 #include <stdbool.h>
 
@@ -37,18 +38,24 @@ void oc_sec_derive_owner_psk(oc_endpoint_t *endpoint, const char *oxm,
                              const size_t obt_uuid_len, uint8_t *key,
                              const size_t key_len);
 void oc_sec_dtls_init_context(void);
-int oc_sec_dtls_send_message(oc_message_t *message);
+int oc_sec_dtls_send_message(/*oc_endpoint_t *endpoint, */struct os_mbuf *message);
 oc_uuid_t *oc_sec_dtls_get_peer_uuid(oc_endpoint_t *endpoint);
 bool oc_sec_dtls_connected(oc_endpoint_t *endpoint);
 
 typedef struct oc_sec_dtls_peer {
-    struct oc_sec_dtls_peer_s *next;
-    OC_LIST_STRUCT(send_queue);
+    //struct oc_sec_dtls_peer_s *next;
+
+    SLIST_ENTRY(oc_sec_dtls_peer) next;
+    SLIST_HEAD(, os_mbuf) send_queue; //OC_LIST_STRUCT(send_queue);
     session_t session;
     oc_uuid_t uuid;
     bool connected;
     oc_clock_time_t timestamp;
 } oc_sec_dtls_peer_t;
+
+typedef enum { DONE = 0, CONTINUE } oc_event_callback_retval_t;
+
+typedef oc_event_callback_retval_t (*oc_trigger_t)(void *);
 
 #ifdef __cplusplus
 }

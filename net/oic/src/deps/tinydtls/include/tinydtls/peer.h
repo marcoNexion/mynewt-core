@@ -36,26 +36,16 @@
 #include "tinydtls.h"
 #include "global.h"
 #include "session.h"
-
 #include "state.h"
 #include "crypto.h"
-
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-#include "uthash.h"
-#endif /* !WITH_CONTIKI && !WITH_OCF */
 
 typedef enum { DTLS_CLIENT=0, DTLS_SERVER } dtls_peer_type;
 
 /** 
  * Holds security parameters, local state and the transport address
  * for each peer. */
-typedef struct dtls_peer_t {
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-  UT_hash_handle hh;
-#else /* !WITH_CONTIKI && !WITH_OCF */
-  struct dtls_peer_t *next;
-#endif /* WITH_CONTIKI || WITH_OCF */
-
+typedef struct dtls_peer_s{
+  SLIST_ENTRY(dtls_peer_s) next;
   session_t session;	     /**< peer address and local interface */
 
   dtls_peer_type role;       /**< denotes if this host is DTLS_CLIENT or DTLS_SERVER */

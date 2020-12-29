@@ -60,106 +60,48 @@
 #include "../include/tinydtls/netq.h"
 #include "../include/tinydtls/hmac.h"
 
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-#include <pthread.h>
-#endif /* !WITH_CONTIKI && !WITH_OCF */
-
 #define HMAC_UPDATE_SEED(Context,Seed,Length)		\
   if (Seed) dtls_hmac_update(Context, (Seed), (Length))
 
 static struct dtls_cipher_context_t cipher_context;
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-static pthread_mutex_t cipher_context_mutex = PTHREAD_MUTEX_INITIALIZER;
-#endif /* !WITH_CONTIKI && !WITH_OCF */
 
 static struct dtls_cipher_context_t *dtls_cipher_context_get(void)
 {
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-  pthread_mutex_lock(&cipher_context_mutex);
-#endif /* !WITH_CONTIKI && !WITH_OCF */
   return &cipher_context;
 }
 
 static void dtls_cipher_context_release(void)
 {
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-  pthread_mutex_unlock(&cipher_context_mutex);
-#endif /* !WITH_CONTIKI && !WITH_OCF */
+
 }
 
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF)
-void crypto_init()
-{
-}
 
-static dtls_handshake_parameters_t *dtls_handshake_malloc() {
-  return malloc(sizeof(dtls_handshake_parameters_t));
-}
-
-static void dtls_handshake_dealloc(dtls_handshake_parameters_t *handshake) {
-  free(handshake);
-}
-
-static dtls_security_parameters_t *dtls_security_malloc() {
-  return malloc(sizeof(dtls_security_parameters_t));
-}
-
-static void dtls_security_dealloc(dtls_security_parameters_t *security) {
-  free(security);
-}
-#else /* !WITH_CONTIKI && !WITH_OCF */
-#ifdef WITH_CONTIKI
-#include "memb.h"
-MEMB(handshake_storage, dtls_handshake_parameters_t, DTLS_HANDSHAKE_MAX);
-MEMB(security_storage, dtls_security_parameters_t, DTLS_SECURITY_MAX);
+/*TODO ML*/
+//#include "util/oc_memb.h"
+//OC_MEMB(handshake_storage, dtls_handshake_parameters_t, DTLS_HANDSHAKE_MAX);
+//OC_MEMB(security_storage, dtls_security_parameters_t, DTLS_SECURITY_MAX);
 
 void crypto_init() {
-  memb_init(&handshake_storage);
-  memb_init(&security_storage);
+  //oc_memb_init(&handshake_storage);
+  //oc_memb_init(&security_storage);
 }
 
 static dtls_handshake_parameters_t *dtls_handshake_malloc() {
-  return memb_alloc(&handshake_storage);
+  return NULL;//oc_memb_alloc(&handshake_storage);
 }
 
 static void dtls_handshake_dealloc(dtls_handshake_parameters_t *handshake) {
-  memb_free(&handshake_storage, handshake);
+  //oc_memb_free(&handshake_storage, handshake);
 }
 
 static dtls_security_parameters_t *dtls_security_malloc() {
-  return memb_alloc(&security_storage);
+  return NULL;//oc_memb_alloc(&security_storage);
 }
 
 static void dtls_security_dealloc(dtls_security_parameters_t *security) {
-  memb_free(&security_storage, security);
-}
-#else /* WITH_CONTIKI */
-#include "util/oc_memb.h"
-OC_MEMB(handshake_storage, dtls_handshake_parameters_t, DTLS_HANDSHAKE_MAX);
-OC_MEMB(security_storage, dtls_security_parameters_t, DTLS_SECURITY_MAX);
-
-void crypto_init() {
-  oc_memb_init(&handshake_storage);
-  oc_memb_init(&security_storage);
+  //oc_memb_free(&security_storage, security);
 }
 
-static dtls_handshake_parameters_t *dtls_handshake_malloc() {
-  return oc_memb_alloc(&handshake_storage);
-}
-
-static void dtls_handshake_dealloc(dtls_handshake_parameters_t *handshake) {
-  oc_memb_free(&handshake_storage, handshake);
-}
-
-static dtls_security_parameters_t *dtls_security_malloc() {
-  return oc_memb_alloc(&security_storage);
-}
-
-static void dtls_security_dealloc(dtls_security_parameters_t *security) {
-  oc_memb_free(&security_storage, security);
-}
-#endif /* WITH_OCF */
-#endif /* WITH_CONTIKI || WITH_OCF */
 
 dtls_handshake_parameters_t *dtls_handshake_new()
 {
@@ -189,7 +131,7 @@ void dtls_handshake_free(dtls_handshake_parameters_t *handshake)
   if (!handshake)
     return;
 
-  netq_delete_all(handshake->reorder_queue);
+  netq_delete_all((netq_list_t*)&handshake->reorder_queue);
   dtls_handshake_dealloc(handshake);
 }
 

@@ -6,12 +6,12 @@
  * LICENSE for terms of use.
  */
 
-#ifndef _DTLS_NETQ_H_
-#define _DTLS_NETQ_H_
+#ifndef _NETQ_H_
+#define _NETQ_H_
 
 #include "tinydtls.h"
 #include "global.h"
-#include "dtls.h"
+#include "peer.h"
 #include "dtls_time.h"
 
 /**
@@ -34,31 +34,32 @@
  * DTLS_MAX_BUF to simplify memory management on constrained nodes. */ 
 typedef unsigned char netq_packet_t[DTLS_MAX_BUF];
 
-typedef struct netq_t {
-  struct netq_t *next;
+SLIST_HEAD(dtls_peer_list, dtls_peer_s);
+typedef struct dtls_peer_list dtls_peer_list_t;
+
+typedef struct netq_s {
+  SLIST_ENTRY(netq_s) next;
 
   clock_time_t t;	        /**< when to send PDU for the next time */
   unsigned int timeout;		/**< randomized timeout value */
 
-  dtls_peer_t *peer;		/**< remote address */
+  //SLIST_HEAD(, dtls_peer_t) peer;  //struct dtls_peer_t *peer;		/**< remote address */
+
+  dtls_peer_t *peer;
+
   uint16_t epoch;
   uint8_t type;
   unsigned char retransmit_cnt;	/**< retransmission counter, will be removed when zero */
 
   size_t length;		/**< actual length of data */
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-  unsigned char data[];		/**< the datagram to send */
-#else
-  netq_packet_t data;		/**< the datagram to send */
-#endif
+  uint8_t *data;//struct os_mbuf *data;  //netq_packet_t data;		/**< the datagram to send */
+  
 } netq_t;
 
-#if !defined(WITH_CONTIKI) && !defined(WITH_OCF) && !defined(MYNEWT)
-static inline void netq_init()
-{ }
-#else /* !WITH_CONTIKI && !WITH_OCF */
+SLIST_HEAD(node_queue_s, netq_s);
+typedef struct node_queue_s netq_list_t;
+
 void netq_init();
-#endif /* WITH_CONTIKI || WITH_OCF */
 
 /** 
  * Adds a node to the given queue, ordered by their time-stamp t.
@@ -69,14 +70,15 @@ void netq_init();
  * @param node  The new item to add.
  * @return @c 0 on error, or non-zero if the new item was added.
  */
-int netq_insert_node(list_t queue, netq_t *node);
+//int netq_insert_node(list_t queue, netq_t *node);
+int netq_insert_node(netq_list_t *queue, netq_t *node);
 
 /** Destroys specified node and releases any memory that was allocated
  * for the associated datagram. */
 void netq_node_free(netq_t *node);
 
 /** Removes all items from given queue and frees the allocated storage */
-void netq_delete_all(list_t queue);
+void netq_delete_all(netq_list_t *nqueue);
 
 /** Creates a new node suitable for adding to a netq_t queue. */
 netq_t *netq_node_new(size_t size);
@@ -85,17 +87,17 @@ netq_t *netq_node_new(size_t size);
  * Returns a pointer to the first item in given queue or NULL if
  * empty. 
  */
-netq_t *netq_head(list_t queue);
+netq_t *netq_head(netq_list_t *queue);
 
 netq_t *netq_next(netq_t *p);
-void netq_remove(list_t queue, netq_t *p);
+void netq_remove(netq_list_t *queue, netq_t *p);
 
 /**
  * Removes the first item in given queue and returns a pointer to the
  * removed element. If queue is empty when netq_pop_first() is called,
  * this function returns NULL.
  */
-netq_t *netq_pop_first(list_t queue);
+netq_t *netq_pop_first(netq_list_t *queue);
 
 /**@}*/
 
