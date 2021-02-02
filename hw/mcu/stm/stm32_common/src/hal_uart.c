@@ -543,9 +543,11 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
         }
         break;
     }
+    /* disable Noise error and overrun detection*/
+    cr3 |= (USART_CR3_ONEBIT | USART_CR3_OVRDIS);
 
 #if !MYNEWT_VAL(MCU_STM32F1)
-    cr1 |= (UART_MODE_RX | UART_MODE_TX | UART_OVERSAMPLING_16);
+    cr1 |= (UART_MODE_RX | UART_MODE_TX | UART_OVERSAMPLING_8);
 #else
     cr1 |= (UART_MODE_TX_RX | UART_OVERSAMPLING_16);
 #endif
@@ -585,7 +587,7 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
       case UART_CLOCKSOURCE_PCLK1:
         pclk = HAL_RCC_GetPCLK1Freq();
 #if defined(USART_PRESC_PRESCALER)
-        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate, prescaler));
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING8(pclk, baudrate, prescaler));
 #else
         usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate));
 #endif /* USART_PRESC_PRESCALER */
@@ -593,14 +595,14 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
       case UART_CLOCKSOURCE_PCLK2:
         pclk = HAL_RCC_GetPCLK2Freq();
 #if defined(USART_PRESC_PRESCALER)
-        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate, prescaler));
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING8(pclk, baudrate, prescaler));
 #else
         usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate));
 #endif /* USART_PRESC_PRESCALER */
         break;
       case UART_CLOCKSOURCE_HSI:
 #if defined(USART_PRESC_PRESCALER)
-        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(HSI_VALUE, baudrate, prescaler));
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING8(HSI_VALUE, baudrate, prescaler));
 #else
         usartdiv = (uint16_t)(UART_DIV_SAMPLING16(HSI_VALUE, baudrate));
 #endif /* USART_PRESC_PRESCALER */
@@ -608,14 +610,14 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
       case UART_CLOCKSOURCE_SYSCLK:
         pclk = HAL_RCC_GetSysClockFreq();
 #if defined(USART_PRESC_PRESCALER)
-        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate, prescaler));
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING8(pclk, baudrate, prescaler));
 #else
         usartdiv = (uint16_t)(UART_DIV_SAMPLING16(pclk, baudrate));
 #endif /* USART_PRESC_PRESCALER */
         break;
       case UART_CLOCKSOURCE_LSE:
 #if defined(USART_PRESC_PRESCALER)
-        usartdiv = (uint16_t)(UART_DIV_SAMPLING16((uint32_t)LSE_VALUE, baudrate, prescaler));
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING8((uint32_t)LSE_VALUE, baudrate, prescaler));
 #else
         usartdiv = (uint16_t)(UART_DIV_SAMPLING16(LSE_VALUE, baudrate));
 #endif /* USART_PRESC_PRESCALER */
