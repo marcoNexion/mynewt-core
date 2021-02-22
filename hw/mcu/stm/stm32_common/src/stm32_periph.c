@@ -392,6 +392,27 @@ stm32_periph_create_i2c(void)
 #if MYNEWT_VAL(I2C_0)
     rc = hal_i2c_init(0, (void *)&os_bsp_i2c0_cfg);
     assert(rc == 0);
+#if 0
+    struct hal_i2c_master_data data;
+    uint8_t buf[8];
+    buf[0]=0;
+    buf[1]=1;
+    buf[2]=2;
+    buf[3]=3;
+    buf[4]=4;
+    buf[5]=5;
+    buf[6]=6;
+    buf[7]=7;
+
+    data.address = (0xD3>>1);
+    data.buffer = buf;
+    data.len = 8;
+    while(1){
+
+        rc = hal_i2c_master_write(0, &data, 0xFFFFFFFFU, 1);
+        assert(rc == 0);
+    }
+#endif
 #endif
 #if MYNEWT_VAL(I2C_1)
     rc = hal_i2c_init(1, (void *)&os_bsp_i2c1_cfg);
