@@ -25,6 +25,14 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#define EXT_GPIO_FOR_LATENCY_TESTING
+#ifdef EXT_GPIO_FOR_LATENCY_TESTING 
+#include "bsp/bsp.h"
+#include "hal/hal_gpio.h"
+#define EXT_LATENCY_OUTPUT      GSM_RI
+#endif
+
+
 struct hal_uart {
     USART_TypeDef *u_regs;
     uint8_t u_open:1;
@@ -196,7 +204,9 @@ uart_irq_handler(int num)
     ++ui->ui_cnt;
     u = ui->ui_uart;
     regs = u->u_regs;
-
+#ifdef EXT_GPIO_FOR_LATENCY_TESTING
+    hal_gpio_toggle(EXT_LATENCY_OUTPUT);
+#endif
     isr = STATUS(regs);
     if (isr & RXNE) {
         data = RXDR(regs);
@@ -232,6 +242,8 @@ uart_irq_handler(int num)
     /* clear overrun */
     if (isr & USART_ISR_ORE) {
         regs->ICR |= USART_ICR_ORECF;
+        data = RXDR(regs);
+        rc = u->u_rx_func(u->u_func_arg, data);
     }
 #else
     /* clear overrun */
@@ -446,6 +458,11 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
     GPIO_InitTypeDef gpio;
 #endif
 
+#ifdef EXT_GPIO_FOR_LATENCY_TESTING
+    //hal_gpio_init_af(EXT_WFI_OUTPUT, GPIO_AF0_SWJ, 0, 1);
+    hal_gpio_init_out(EXT_LATENCY_OUTPUT, 1);
+#endif
+
     u = uart_by_port(port);
     if (!u || u->u_open) {
         return -1;
@@ -544,10 +561,10 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
         break;
     }
     /* disable Noise error and overrun detection*/
-    cr3 |= (USART_CR3_ONEBIT | USART_CR3_OVRDIS);
+    cr3 |= (USART_CR3_ONEBIT /*| USART_CR3_OVRDIS*/);
 
 #if !MYNEWT_VAL(MCU_STM32F1)
-    cr1 |= (UART_MODE_RX | UART_MODE_TX | UART_OVERSAMPLING_8);
+    cr1 |= (UART_MODE_RX | UART_MODE_TX | UART_OVERSAMPLING_16);
 #else
     cr1 |= (UART_MODE_TX_RX | UART_OVERSAMPLING_16);
 #endif
@@ -602,7 +619,7 @@ hal_uart_config(int port, int32_t baudrate, uint8_t databits, uint8_t stopbits,
         break;
       case UART_CLOCKSOURCE_HSI:
 #if defined(USART_PRESC_PRESCALER)
-        usartdiv = (uint16_t)(UART_DIV_SAMPLING8(HSI_VALUE, baudrate, prescaler));
+        usartdiv = (uint16_t)(UART_DIV_SAMPLING16(HSI_VALUE, baudrate, prescaler));
 #else
         usartdiv = (uint16_t)(UART_DIV_SAMPLING16(HSI_VALUE, baudrate));
 #endif /* USART_PRESC_PRESCALER */
@@ -691,8 +708,12 @@ hal_uart_close(int port)
         return -1;
     }
 
+    (void)RXDR(u->u_regs);
+    (void)STATUS(u->u_regs);
     u->u_open = 0;
     u->u_regs->CR1 = 0;
-
+    u->u_regs->CR2 = 0;
+    u->u_regs->CR3 = 0;
+    
     return 0;
 }
