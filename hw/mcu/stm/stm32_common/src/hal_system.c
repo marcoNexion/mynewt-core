@@ -21,6 +21,8 @@
 #include "os/mynewt.h"
 #include "hal/hal_system.h"
 
+extern void IRQset_get_status(void);
+
 void
 hal_system_reset(void)
 {
@@ -28,6 +30,8 @@ hal_system_reset(void)
 #if MYNEWT_VAL(HAL_SYSTEM_RESET_CB)
     hal_system_reset_cb();
 #endif
+
+    IRQset_get_status();
 
     while (1) {
         HAL_DEBUG_BREAK();
