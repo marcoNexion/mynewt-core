@@ -43,6 +43,7 @@ static __IOM uint32_t * const retained_regs[] = {
     &CMAC->CM_LL_TIMER1_36_10_EQ_Y_REG,
     &CMAC->CM_LL_TIMER1_EQ_X_HI_REG,
     &CMAC->CM_LL_TIMER1_EQ_X_LO_REG,
+    &CMAC->CM_ERROR_DIS_REG,
 #if MYNEWT_VAL(CMAC_DEBUG_DIAG_ENABLE)
     &CMAC->CM_DIAG_PORT0_REG,
     &CMAC->CM_DIAG_PORT1_REG,
@@ -198,6 +199,16 @@ cmac_sleep_calculate_wakeup_time(void)
 }
 
 void
+cmac_sleep_recalculate(void)
+{
+    if (cmac_timer_slp_update()) {
+        cmac_sleep_calculate_wakeup_time();
+    }
+}
+
+extern bool ble_rf_try_recalibrate(uint32_t idle_time_us);
+
+void
 cmac_sleep(void)
 {
     bool switch_to_slp;
@@ -214,10 +225,6 @@ cmac_sleep(void)
 
     cmac_pdc_ack_all();
 
-    if (cmac_timer_slp_update()) {
-        cmac_sleep_calculate_wakeup_time();
-    }
-
     wakeup_at = cmac_timer_next_at();
 
     /*
@@ -230,6 +237,10 @@ cmac_sleep(void)
         switch_to_slp = false;
         deep_sleep = false;
         goto do_sleep;
+    }
+
+    if (ble_rf_try_recalibrate(sleep_usecs)) {
+        goto skip_sleep;
     }
 
     sleep_lp_ticks = cmac_timer_usecs_to_lp_ticks(sleep_usecs);
@@ -301,5 +312,6 @@ do_sleep:
         g_mcu_wait_for_swd_start = cmac_timer_read_hi();
     }
 
+skip_sleep:
     MCU_DIAG_SER('>');
 }
